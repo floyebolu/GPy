@@ -36,10 +36,10 @@ class vpython_show(data_show):
     """
 
     def __init__(self, vals, scene=None):
-        data_show.__init__(self, vals)
+        super(vpython_show, self).__init__(vals)
         # If no axes are defined, create some.
 
-        if scene==None:
+        if scene is None:
             self.scene = visual.display(title='Data Visualization')
         else:
             self.scene = scene
@@ -54,10 +54,10 @@ class matplotlib_show(data_show):
     the matplotlib_show class is a base class for all visualization methods that use matplotlib. It is initialized with an axis. If the axis is set to None it creates a figure window.
     """
     def __init__(self, vals, axes=None):
-        data_show.__init__(self, vals)
+        super(matplotlib_show, self).__init__(vals)
         # If no axes are defined, create some.
 
-        if axes==None:
+        if axes is None:
             fig = plt.figure()
             self.axes = fig.add_subplot(111)
         else:
@@ -72,7 +72,7 @@ class vector_show(matplotlib_show):
     vector elements alongside their indices.
     """
     def __init__(self, vals, axes=None):
-        matplotlib_show.__init__(self, vals, axes)
+        super(vector_show, self).__init__(vals, axes)
         #assert vals.ndim == 2, "Please give a vector in [n x 1] to plot"
         #assert vals.shape[1] == 1, "only showing a vector in one dimension"
         self.size = vals.size
@@ -102,7 +102,7 @@ class lvm(matplotlib_show):
                 vals = model.X.values
         if len(vals.shape)==1:
             vals = vals[None,:]
-        matplotlib_show.__init__(self, vals, axes=latent_axes)
+        super(lvm, self).__init__(vals, axes=latent_axes)
 
         if isinstance(latent_axes,mpl.axes.Axes):
             self.cid = latent_axes.figure.canvas.mpl_connect('button_press_event', self.on_click)
@@ -190,7 +190,7 @@ class lvm_subplots(lvm):
     def __init__(self, vals, Model, data_visualize, latent_axes=None, sense_axes=None):
         self.nplots = int(np.ceil(Model.input_dim/2.))+1
         assert len(latent_axes)==self.nplots
-        if vals==None:
+        if vals is None:
             vals = Model.X[0, :]
         self.latent_values = vals
 
@@ -198,10 +198,10 @@ class lvm_subplots(lvm):
             if i == self.nplots-1:
                 if self.nplots*2!=Model.input_dim:
                     latent_index = [i*2, i*2]
-                lvm.__init__(self, self.latent_vals, Model, data_visualize, axis, sense_axes, latent_index=latent_index)
+                super(lvm_subplots, self).__init__(self.latent_vals, Model, data_visualize, axis, sense_axes, latent_index=latent_index)
             else:
                 latent_index = [i*2, i*2+1]
-                lvm.__init__(self, self.latent_vals, Model, data_visualize, axis, latent_index=latent_index)
+                super(lvm_subplots, self).__init__(self.latent_vals, Model, data_visualize, axis, latent_index=latent_index)
 
 
 
@@ -215,15 +215,15 @@ class lvm_dimselect(lvm):
 
     """
     def __init__(self, vals, model, data_visualize, latent_axes=None, sense_axes=None, latent_index=[0, 1], labels=None):
-        if latent_axes==None and sense_axes==None:
+        if latent_axes is None and sense_axes is None:
             self.fig,(latent_axes,self.sense_axes) = plt.subplots(1,2)
-        elif sense_axes==None:
+        elif sense_axes is None:
             fig=plt.figure()
             self.sense_axes = fig.add_subplot(111)
         else:
             self.sense_axes = sense_axes
         self.labels = labels
-        lvm.__init__(self,vals,model,data_visualize,latent_axes,sense_axes,latent_index)
+        super(lvm_dimselect, self).__init__(vals,model,data_visualize,latent_axes,sense_axes,latent_index)
         self.show_sensitivities()
         print(self.latent_values)
         print("use left and right mouse buttons to select dimensions")
@@ -286,7 +286,7 @@ class image_show(matplotlib_show):
     :type cmap: matplotlib.cm"""
 
     def __init__(self, vals, axes=None, dimensions=(16,16), transpose=False, order='C', invert=False, scale=False, palette=[], preset_mean=0., preset_std=1., select_image=0, cmap=None):
-        matplotlib_show.__init__(self, vals, axes)
+        super(image_show, self).__init__(vals, axes)
         self.dimensions = dimensions
         self.transpose = transpose
         self.order = order
@@ -300,7 +300,7 @@ class image_show(matplotlib_show):
         self.set_image(self.vals)
         if not self.palette == []: # Can just show the image (self.set_image() took care of setting the palette)
             self.handle = self.axes.imshow(self.vals, interpolation='nearest')
-        elif cmap==None: # Use a jet map.
+        elif cmap is None: # Use a jet map.
             self.handle = self.axes.imshow(self.vals, cmap=plt.cm.jet, interpolation='nearest') # @UndefinedVariable
         else: # Use the selected map.
             self.handle = self.axes.imshow(self.vals, cmap=cmap, interpolation='nearest') # @UndefinedVariable
@@ -352,7 +352,7 @@ class mocap_data_show_vpython(vpython_show):
     """Base class for visualizing motion capture data using visual module."""
 
     def __init__(self, vals, scene=None, connect=None, radius=0.1):
-        vpython_show.__init__(self, vals, scene)
+        super(mocap_data_show_vpython, self).__init__(vals, scene)
         self.radius = radius
         self.connect = connect
         self.process_values()
@@ -368,7 +368,7 @@ class mocap_data_show_vpython(vpython_show):
     def draw_edges(self):
         self.rods = []
         self.line_handle = []
-        if not self.connect==None:
+        if self.connect is not None:
             self.I, self.J = np.nonzero(self.connect)
             for i, j in zip(self.I, self.J):
                 pos, axis = self.pos_axis(i, j)
@@ -380,7 +380,7 @@ class mocap_data_show_vpython(vpython_show):
 
     def modify_edges(self):
         self.line_handle = []
-        if not self.connect==None:
+        if self.connect is not None:
             self.I, self.J = np.nonzero(self.connect)
             for rod, i, j in zip(self.rods, self.I, self.J):
                 rod.pos, rod.axis = self.pos_axis(i, j)
@@ -409,10 +409,10 @@ class mocap_data_show(matplotlib_show):
     """Base class for visualizing motion capture data."""
 
     def __init__(self, vals, axes=None, connect=None, color='b'):
-        if axes==None:
+        if axes is None:
             fig = plt.figure()
-            axes = fig.add_subplot(111, projection='3d', aspect='equal')
-        matplotlib_show.__init__(self, vals, axes)
+            axes = fig.add_subplot(111, projection='3d') #, aspect='equal') aspect equal not implemented in 3D plots currently see this issue: https://github.com/matplotlib/matplotlib/issues/17172
+        super(mocap_data_show, self).__init__(vals, axes)
 
         self.color = color
         self.connect = connect
@@ -428,7 +428,7 @@ class mocap_data_show(matplotlib_show):
 
     def draw_edges(self):
         self.line_handle = []
-        if not self.connect==None:
+        if self.connect is not None:
             x = []
             y = []
             z = []
@@ -496,10 +496,15 @@ class stick_show(mocap_data_show):
     def __init__(self, vals, connect=None, axes=None):
         if len(vals.shape)==1:
             vals = vals[None,:]
-        mocap_data_show.__init__(self, vals, axes=axes, connect=connect)
+        super(stick_show, self).__init__(vals, axes=axes, connect=connect)
 
     def process_values(self):
-        self.vals = self.vals.reshape((3, self.vals.shape[1]/3)).T
+        """Convert vector of values into a matrix for use as a 3-D point cloud."""
+        try:
+            self.vals = self.vals.reshape((3, self.vals.shape[1]//3)).T
+        except ValueError as e:
+            raise ValueError("Passed values to stick_show need to have a dimension which is divisible by 3 for display as they should be a point cloud of 3-D points.") from e
+            
 
 class skeleton_show(mocap_data_show):
     """data_show class for visualizing motion capture data encoded as a skeleton with angles."""
@@ -515,7 +520,7 @@ class skeleton_show(mocap_data_show):
         self.skel = skel
         self.padding = padding
         connect = skel.connection_matrix()
-        mocap_data_show.__init__(self, vals, axes=axes, connect=connect, color=color)
+        super(skeleton_show, self).__init__(vals, axes=axes, connect=connect, color=color)
     def process_values(self):
         """Takes a set of angles and converts them to the x,y,z coordinates in the internal prepresentation of the class, ready for plotting.
 

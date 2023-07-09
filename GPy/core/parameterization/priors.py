@@ -17,7 +17,7 @@ class Prior(object):
         if not cls._instance or cls._instance.__class__ is not cls:
                 newfunc = super(Prior, cls).__new__
                 if newfunc is object.__new__:
-                    cls._instance = newfunc(cls)  
+                    cls._instance = newfunc(cls)
                 else:
                     cls._instance = newfunc(cls, *args, **kwargs)
                 return cls._instance
@@ -58,9 +58,9 @@ class Gaussian(Prior):
                     return instance()
         newfunc = super(Prior, cls).__new__
         if newfunc is object.__new__:
-            o = newfunc(cls)  
+            o = newfunc(cls)
         else:
-            o = newfunc(cls, mu, sigma)            
+            o = newfunc(cls, mu, sigma)
         cls._instances.append(weakref.ref(o))
         return cls._instances[-1]()
 
@@ -102,9 +102,9 @@ class Uniform(Prior):
                     return instance()
         newfunc = super(Prior, cls).__new__
         if newfunc is object.__new__:
-            o = newfunc(cls)  
+            o = newfunc(cls)
         else:
-            o = newfunc(cls, lower, upper)     
+            o = newfunc(cls, lower, upper)
         cls._instances.append(weakref.ref(o))
         return cls._instances[-1]()
 
@@ -200,37 +200,50 @@ class MultivariateGaussian(Prior):
 
     def __new__(cls, mu=0, var=1):  # Singleton:
         if cls._instances:
-            cls._instances[:] = [instance for instance in cls._instances if instance()]
+            cls._instances[:] = [instance for instance in cls._instances if
+                                 instance()]
             for instance in cls._instances:
-                if np.all(instance().mu == mu) and np.all(instance().var == var):
+                if np.all(instance().mu == mu) and np.all(
+                        instance().var == var):
                     return instance()
-        o = super(Prior, cls).__new__(cls, mu, var)
+        newfunc = super(Prior, cls).__new__
+        if newfunc is object.__new__:
+            o = newfunc(cls)
+        else:
+            o = newfunc(cls, mu, var)
         cls._instances.append(weakref.ref(o))
         return cls._instances[-1]()
 
     def __init__(self, mu, var):
         self.mu = np.array(mu).flatten()
         self.var = np.array(var)
-        assert len(self.var.shape) == 2
-        assert self.var.shape[0] == self.var.shape[1]
+        assert len(self.var.shape) == 2, 'Covariance must be a matrix'
+        assert self.var.shape[0] == self.var.shape[1], \
+            'Covariance must be a square matrix'
         assert self.var.shape[0] == self.mu.size
         self.input_dim = self.mu.size
-        self.inv, self.hld = pdinv(self.var)
-        self.constant = -0.5 * self.input_dim * np.log(2 * np.pi) - self.hld
+        self.inv, _, self.hld, _ = pdinv(self.var)
+        self.constant = -0.5 * (self.input_dim * np.log(2 * np.pi) + self.hld)
+
+    def __str__(self):
+        return 'MultiN(' + str(self.mu) + ', ' + str(np.diag(self.var)) + ')'
 
     def summary(self):
         raise NotImplementedError
 
     def pdf(self, x):
+        x = np.array(x).flatten()
         return np.exp(self.lnpdf(x))
 
     def lnpdf(self, x):
+        x = np.array(x).flatten()
         d = x - self.mu
-        return self.constant - 0.5 * np.sum(d * np.dot(d, self.inv), 1)
+        return self.constant - 0.5 * np.dot(d.T, np.dot(self.inv, d))
 
     def lnpdf_grad(self, x):
+        x = np.array(x).flatten()
         d = x - self.mu
-        return -np.dot(self.inv, d)
+        return - np.dot(self.inv, d)
 
     def rvs(self, n):
         return np.random.multivariate_normal(self.mu, self.var, n)
@@ -247,14 +260,15 @@ class MultivariateGaussian(Prior):
         return self.mu, self.var
 
     def __setstate__(self, state):
-        self.mu = state[0]
+        self.mu = np.array(state[0]).flatten()
         self.var = state[1]
-        assert len(self.var.shape) == 2
-        assert self.var.shape[0] == self.var.shape[1]
+        assert len(self.var.shape) == 2, 'Covariance must be a matrix'
+        assert self.var.shape[0] == self.var.shape[1], \
+            'Covariance must be a square matrix'
         assert self.var.shape[0] == self.mu.size
         self.input_dim = self.mu.size
-        self.inv, self.hld = pdinv(self.var)
-        self.constant = -0.5 * self.input_dim * np.log(2 * np.pi) - self.hld
+        self.inv, _, self.hld, _ = pdinv(self.var)
+        self.constant = -0.5 * (self.input_dim * np.log(2 * np.pi) + self.hld)
 
 def gamma_from_EV(E, V):
     warnings.warn("use Gamma.from_EV to create Gamma Prior", FutureWarning)
@@ -282,7 +296,7 @@ class Gamma(Prior):
                     return instance()
         newfunc = super(Prior, cls).__new__
         if newfunc is object.__new__:
-            o = newfunc(cls)  
+            o = newfunc(cls)
         else:
             o = newfunc(cls, a, b)
         cls._instances.append(weakref.ref(o))
@@ -357,23 +371,16 @@ class InverseGamma(Gamma):
     """
     domain = _POSITIVE
     _instances = []
-    def __new__(cls, a=1, b=.5): # Singleton:
-        if cls._instances:
-            cls._instances[:] = [instance for instance in cls._instances if instance()]
-            for instance in cls._instances:
-                if instance().a == a and instance().b == b:
-                    return instance()
-        o = super(Prior, cls).__new__(cls, a, b)
-        cls._instances.append(weakref.ref(o))
-        return cls._instances[-1]()
-
-    def __init__(self, a, b):
-        self._a = float(a)
-        self._b = float(b)
-        self.constant = -gammaln(self.a) + a * np.log(b)
 
     def __str__(self):
         return "iGa({:.2g}, {:.2g})".format(self.a, self.b)
+
+    def summary(self):
+        return {}
+
+    @staticmethod
+    def from_EV(E, V):
+        raise NotImplementedError
 
     def lnpdf(self, x):
         return self.constant - (self.a + 1) * np.log(x) - self.b / x
@@ -383,7 +390,6 @@ class InverseGamma(Gamma):
 
     def rvs(self, n):
         return 1. / np.random.gamma(scale=1. / self.b, shape=self.a, size=n)
-
 
 class DGPLVM_KFDA(Prior):
     """
@@ -542,8 +548,8 @@ class DGPLVM(Prior):
 
     """
     domain = _REAL
-    
-    def __new__(cls, sigma2, lbl, x_shape): 
+
+    def __new__(cls, sigma2, lbl, x_shape):
         return super(Prior, cls).__new__(cls, sigma2, lbl, x_shape)
 
     def __init__(self, sigma2, lbl, x_shape):
@@ -909,13 +915,13 @@ class DGPLVM_Lamda(Prior, Parameterized):
     # This function calculates log of our prior
     def lnpdf(self, x):
         x = x.reshape(self.x_shape)
-	
-	#!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	#self.lamda.values[:] = self.lamda.values/self.lamda.values.sum()	
+
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #self.lamda.values[:] = self.lamda.values/self.lamda.values.sum()
 
         xprime = x.dot(np.diagflat(self.lamda))
         x = xprime
-	# print x
+        # print x
         cls = self.compute_cls(x)
         M_0 = np.mean(x, axis=0)
         M_i = self.compute_Mi(cls)
@@ -932,7 +938,7 @@ class DGPLVM_Lamda(Prior, Parameterized):
         x = x.reshape(self.x_shape)
         xprime = x.dot(np.diagflat(self.lamda))
         x = xprime
-	# print x
+        # print x
         cls = self.compute_cls(x)
         M_0 = np.mean(x, axis=0)
         M_i = self.compute_Mi(cls)
@@ -964,14 +970,14 @@ class DGPLVM_Lamda(Prior, Parameterized):
 
         # Because of the GPy we need to transpose our matrix so that it gets the same shape as out matrix (denominator layout!!!)
         DPxprim_Dx = DPxprim_Dx.T
-    
+
         DPxprim_Dlamda = DPx_Dx.dot(x)
 
-    	# Because of the GPy we need to transpose our matrix so that it gets the same shape as out matrix (denominator layout!!!)
+        # Because of the GPy we need to transpose our matrix so that it gets the same shape as out matrix (denominator layout!!!)
         DPxprim_Dlamda = DPxprim_Dlamda.T
 
         self.lamda.gradient = np.diag(DPxprim_Dlamda)
-	# print DPxprim_Dx
+        # print DPxprim_Dx
         return DPxprim_Dx
 
 
@@ -1046,7 +1052,7 @@ class DGPLVM_T(Prior):
         M_i = np.zeros((self.classnum, self.dim))
         for i in cls:
             # Mean of each class
-	    # class_i = np.multiply(cls[i],vec)
+            # class_i = np.multiply(cls[i],vec)
             class_i = cls[i]
             M_i[i] = np.mean(class_i, axis=0)
         return M_i
@@ -1155,7 +1161,7 @@ class DGPLVM_T(Prior):
         x = x.reshape(self.x_shape)
         xprim = x.dot(self.vec)
         x = xprim
-	# print x  
+        # print x
         cls = self.compute_cls(x)
         M_0 = np.mean(x, axis=0)
         M_i = self.compute_Mi(cls)
@@ -1163,7 +1169,7 @@ class DGPLVM_T(Prior):
         Sw = self.compute_Sw(cls, M_i)
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
         #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-	#print 'SB_inv: ', Sb_inv_N
+        #print 'SB_inv: ', Sb_inv_N
         #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
         Sb_inv_N = pdinv(Sb+np.eye(Sb.shape[0])*0.1)[0]
         return (-1 / self.sigma2) * np.trace(Sb_inv_N.dot(Sw))
@@ -1172,8 +1178,8 @@ class DGPLVM_T(Prior):
     def lnpdf_grad(self, x):
         x = x.reshape(self.x_shape)
         xprim = x.dot(self.vec)
-        x = xprim 
-	# print x       
+        x = xprim
+        # print x
         cls = self.compute_cls(x)
         M_0 = np.mean(x, axis=0)
         M_i = self.compute_Mi(cls)
@@ -1188,7 +1194,7 @@ class DGPLVM_T(Prior):
         # Calculating inverse of Sb and its transpose and minus
         # Sb_inv_N = np.linalg.inv(Sb + np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))
         #Sb_inv_N = np.linalg.inv(Sb+np.eye(Sb.shape[0])*0.1)
-	#print 'SB_inv: ',Sb_inv_N
+        #print 'SB_inv: ',Sb_inv_N
         #Sb_inv_N = pdinv(Sb+ np.eye(Sb.shape[0]) * (np.diag(Sb).min() * 0.1))[0]
         Sb_inv_N = pdinv(Sb+np.eye(Sb.shape[0])*0.1)[0]
         Sb_inv_N_trans = np.transpose(Sb_inv_N)
@@ -1375,4 +1381,5 @@ class StudentT(Prior):
     def rvs(self, n):
         from scipy.stats import t
         ret = t.rvs(self.nu, loc=self.mu, scale=self.sigma, size=n)
-        return ret    
+        return ret
+
