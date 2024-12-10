@@ -28,15 +28,18 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           pip install setuptools
-          pip install matplotlib
-          pip install pytest
       
       - name: Install lib
         run: |
           python setup.py develop
+      
+      - name: Install test dependencies
+        run: |
+          pip install matplotlib
+          pip install pytest
 
       - name: pytest
         run: |
@@ -57,19 +60,23 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           pip install setuptools
-          pip install matplotlib
-          pip install pytest
-      
+
       - name: Install lib
         run: |
           python setup.py develop
 
+      - name: Install test dependencies
+        run: |
+          pip install matplotlib
+          pip install pytest
+
       - name: pytest
         run: |
           pytest GPy/testing
+
   test-macos:
     strategy:
       matrix:
@@ -88,12 +95,15 @@ jobs:
       - name: Install dependencies
         run: |
           pip install setuptools
-          pip install matplotlib
-          pip install pytest
       
       - name: Install lib
         run: |
           python setup.py develop
+
+      - name: Install test dependencies
+        run: |
+          pip install matplotlib
+          pip install pytest
 
       - name: pytest
         run: |
@@ -170,49 +180,51 @@ jobs:
         matrix:
           python: ['cp39-cp39', 'cp310-cp310', 'cp311-cp311', 'cp312-cp312']
     runs-on: ubuntu-latest
-    container:
-      image: quay.io/pypa/manylinux2014_x86_64
+    container: quay.io/pypa/manylinux2014_x86_64
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v1
 
-      - name: Compile c headers
-        run: |
-          /opt/python/${{ matrix.python }}/bin/python setup.py develop
+    - name: Compile c headers
+      run: |
+        /opt/python/${{ matrix.python }}/bin/python setup.py develop
 
-      - name: Build wheel files
-        run: |
-          /opt/python/${{ matrix.python }}/bin/python setup.py bdist_wheel
+    - name: Build wheel files
+      run: |
+        /opt/python/${{ matrix.python }}/bin/python setup.py bdist_wheel
 
-      - name: Install auditwheel  # this should be available?!
-        run: |
-          /opt/python/${{ matrix.python }}/bin/python -m pip install auditwheel
-      
-      - name: Repair wheel files
-        run: |
-          /opt/python/${{ matrix.python }}/bin/python -m auditwheel repair dist/*${{ matrix.python }}-linux_x86_64.whl
+    - name: Install auditwheel
+      run: |
+        /opt/python/${{ matrix.python }}/bin/python -m pip install auditwheel
+    
+    - name: Repair wheel files
+      run: |
+        /opt/python/${{ matrix.python }}/bin/python -m auditwheel repair dist/*${{ matrix.python }}-linux_x86_64.whl
 
-      - name: List contents of dist
-        run: ls -R dist
+    - name: List contents of dist
+      run: ls -R dist
 
-      - name: List contests of wheelhouse
-        run: ls -R wheelhouse
+    - name: List contests of wheelhouse
+      run: ls -R wheelhouse
 
-      - name: Move wheelhouse wheel files to dist
-        run: |
-          rm dist/*
-          mv wheelhouse/* dist/
-          rmdir wheelhouse
+    - name: Move wheelhouse wheel files to dist
+      run: |
+        rm dist/*
+        mv wheelhouse/* dist/
+        rmdir wheelhouse
 
-      - name: List contents of dist
-        run: ls -R dist
+    - name: List contents of dist
+      run: ls -R dist
 
-      - name: Archive build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: dist-artifacts-manylinux-${{ matrix.python }}
-          path: dist/*
+    - name: Get the name of the wheel file
+      id: get-wheel-name
+      run: echo "::set-output name=wheel-name::$(ls dist/*.whl)"
+
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: dist-artifacts-manylinux-${{ matrix.python }}
+        path: ${{ steps.get-wheel-name.outputs.wheel-name }}
 
   deploy:
     runs-on: ubuntu-latest

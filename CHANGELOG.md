@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+* update prior `__new__` methods #1098 [MartinBubel]
+
+* fix invalid escape sequence #1011 [janmayer]
+
+## v1.13.2 (2024-07-21)
+* update string checks in initialization method for latent variable and put `empirical_samples` init-method on a deprecation path
+
+* update dependencies to `numpy>=1.7.0,<2.0.0`
 
 * update import in `.plotting.matplot_dep.defaults` due to change in matplotlib
 
